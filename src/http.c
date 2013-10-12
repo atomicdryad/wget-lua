@@ -3086,8 +3086,16 @@ Spider mode enabled. Check if remote file exists.\n"));
       else
         *dt &= ~SEND_NOCACHE;
 
-      /* Try fetching the document, or at least its head.  */
-      err = gethttp (u, &hstat, dt, proxy, iri, count);
+      /* The last-minute "can we get this" Lua hook. */
+      bool lua_ok = luahooks_httploop_proceed_p(u, &hstat);
+
+      if (lua_ok) {
+        /* Try fetching the document, or at least its head.  */
+        err = gethttp (u, &hstat, dt, proxy, iri, count);
+      } else {
+	ret = LUA_IGNORED_BY_PATTERN;
+        goto exit;
+      }
 
       /* Time?  */
       tms = datetime_str (time (NULL));
