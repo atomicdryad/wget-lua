@@ -267,6 +267,7 @@ uerr_to_string (const uerr_t v)
       CONST_CASE (WARC_ERR)
       CONST_CASE (WARC_TMP_FOPENERR)
       CONST_CASE (WARC_TMP_FWRITEERR)
+      CONST_CASE (LUA_IGNORED_BY_PATTERN)
     }
   return NULL;
 }
@@ -469,6 +470,30 @@ luahooks_lookup_host (const char *host)
     }
 }
 #undef MAX_HOST_LENGTH
+
+bool
+luahooks_httploop_proceed_p (const struct url *url, const struct http_stat *hstat)
+{
+  if (lua == NULL || !luahooks_function_lookup ("callbacks", "httploop_proceed_p"))
+    return true;
+
+  url_to_lua_table (url);
+  http_stat_to_lua_table (hstat);
+
+  int res = lua_pcall (lua, 2, 1, 0);
+
+  if (res != 0)
+    {
+      handle_lua_error (res);
+      return true;
+    }
+  else
+    {
+      bool answer = lua_toboolean (lua, -1);
+      lua_pop (lua, 1);
+      return answer;
+    }
+}
 
 luahook_action_t
 luahooks_httploop_result (const struct url *url, const uerr_t err, const struct http_stat *hstat)
