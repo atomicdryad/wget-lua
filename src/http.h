@@ -59,6 +59,7 @@ struct http_stat
   wgint orig_file_size;         /* size of file to compare for time-stamping */
   time_t orig_file_tstamp;      /* time-stamp of file to compare for
                                  * time-stamping */
+  bool override_filename;       // Ignore extension chosen by '-E' (for lua)
 };
 
 uerr_t http_loop (struct url *, struct url *, char **, char **, const char *,

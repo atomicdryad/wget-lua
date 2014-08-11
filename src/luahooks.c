@@ -359,6 +359,7 @@ http_stat_to_lua_table (const struct http_stat *hs)
       LUA_PUSH_FROM_STRUCT (boolean, hs, timestamp_checked);
       LUA_PUSH_FROM_STRUCT (string,  hs, orig_file_name);
       LUA_PUSH_FROM_STRUCT (integer, hs, orig_file_size);
+      LUA_PUSH_FROM_STRUCT (boolean, hs, override_filename);
       /* TODO add orig_file_tstamp for completeness? */
     }
 }
@@ -472,7 +473,7 @@ luahooks_lookup_host (const char *host)
 #undef MAX_HOST_LENGTH
 
 bool
-luahooks_httploop_proceed_p (const struct url *url, const struct http_stat *hstat)
+luahooks_httploop_proceed_p (const struct url *url, struct http_stat *hstat)
 {
   if (lua == NULL || !luahooks_function_lookup ("callbacks", "httploop_proceed_p"))
     return true;
@@ -482,17 +483,45 @@ luahooks_httploop_proceed_p (const struct url *url, const struct http_stat *hsta
 
   int res = lua_pcall (lua, 2, 1, 0);
 
-  if (res != 0)
-    {
-      handle_lua_error (res);
+  if (res != 0) {
+    handle_lua_error (res);
+    return true;
+  } else {
+    bool did_override_filename=false;
+    bool override_filename=false;
+
+    if (lua_istable (lua, -1)) {
+      const char *ret;
+      lua_getfield (lua, -1, "local_file");
+      if(lua_isstring(lua, -1)) {
+        ret = lua_tostring (lua, -1);
+        if(ret) {
+          hstat->local_file=strdup(ret);
+          hstat->override_filename = true;
+        }
+      }
+      lua_pop (lua, 1);
+
+      lua_getfield (lua, -1, "override_filename");
+      if(lua_isnumber(lua, -1)) {
+        override_filename=lua_tointeger (lua, -1) == 0 ? false : true;
+        did_override_filename=true;
+      }
+      lua_pop (lua, 1);
+
+      lua_pop (lua, 1); // nuke table
+
+      if(did_override_filename) {
+        hstat->override_filename=override_filename;
+      }
+
       return true;
-    }
-  else
-    {
+    } else {
       bool answer = lua_toboolean (lua, -1);
       lua_pop (lua, 1);
       return answer;
     }
+  }
 }
 
 luahook_action_t
@@ -506,6 +535,7 @@ luahooks_httploop_result (const struct url *url, const uerr_t err, const struct 
   http_stat_to_lua_table (hstat);
 
   int res = lua_pcall (lua, 3, 1, 0);
+
   if (res != 0)
     {
       handle_lua_error (res);
