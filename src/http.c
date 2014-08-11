@@ -2654,7 +2654,7 @@ read_header:
   else
     *dt &= ~TEXTCSS;
 
-  if (opt.adjust_extension)
+  if (opt.adjust_extension && ! hs->override_filename)
     {
       if (*dt & TEXTHTML)
         /* -E / --adjust-extension / adjust_extension = on was specified,
